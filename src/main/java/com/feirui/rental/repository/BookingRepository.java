@@ -1,6 +1,7 @@
 package com.feirui.rental.repository;
 
 import com.feirui.rental.entity.Booking;
+import com.feirui.rental.enums.BookingStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -20,6 +21,24 @@ public interface BookingRepository extends JpaRepository<Booking, Integer> {
      * 用於「我的訂單」頁面顯示該會員的歷史訂單
      */
     List<Booking> findByUserId(Integer userId);
+
+    /**
+     * 查詢所有訂單，依建立時間倒序排列（最新的在最前面）
+     * 用於管理員後台的訂單列表
+     */
+    List<Booking> findAllByOrderByCreatedAtDesc();
+
+    /**
+     * 統計指定狀態的訂單數量
+     * 用於後台儀表板顯示各狀態訂單數
+     */
+    long countByStatus(BookingStatus status);
+
+    /**
+     * 統計指定時間點之後建立的訂單數量
+     * 用於後台儀表板顯示今日新增訂單數
+     */
+    long countByCreatedAtAfter(LocalDateTime date);
 
     /**
      * 將超過付款期限的訂單自動設為 EXPIRED（過期）
