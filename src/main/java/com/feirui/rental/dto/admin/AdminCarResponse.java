@@ -18,6 +18,8 @@ public class AdminCarResponse {
     private String categoryName;
     private BigDecimal pricePerDay;
     private Integer seats;
+    private String luggageDesc;
+    private String description;
     private Boolean isAvailable;
     private String mainImage;
     private Integer totalBookings = 0;

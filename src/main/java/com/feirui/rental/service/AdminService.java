@@ -6,15 +6,22 @@ import com.feirui.rental.enums.BookingStatus;
 import com.feirui.rental.enums.PaymentStatus;
 import com.feirui.rental.repository.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -32,6 +39,9 @@ public class AdminService {
     private static final DateTimeFormatter DATETIME_FORMATTER =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
+    @Value("${app.upload.dir:uploads}")
+    private String uploadDir;
+
     private final UserRepository userRepository;
     private final BookingRepository bookingRepository;
     private final CarRepository carRepository;
@@ -39,6 +49,7 @@ public class AdminService {
     private final PromotionRepository promotionRepository;
     private final ContactRepository contactRepository;
     private final PaymentRepository paymentRepository;
+    private final CarImageRepository carImageRepository;
 
     // ─────────────────────────────────────────────
     // 儀表板
@@ -154,6 +165,138 @@ public class AdminService {
 
         List<Booking> allBookings = bookingRepository.findAll();
         return toCarResponse(saved, allBookings);
+    }
+
+    // ─────────────────────────────────────────────
+    // 車輛更新
+    // ─────────────────────────────────────────────
+
+    /**
+     * 更新車輛基本資料（名稱、品牌、日租金、座位數、行李描述、介紹）
+     */
+    public AdminCarResponse updateCar(Integer id, AdminCarUpdateRequest request) {
+        Car car = carRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("找不到車輛 ID: " + id));
+
+        car.setName(request.getName());
+        car.setBrand(request.getBrand());
+        car.setPricePerDay(request.getPricePerDay());
+        car.setSeats(request.getSeats());
+        car.setLuggageDesc(request.getLuggageDesc());
+        car.setDescription(request.getDescription());
+
+        Car saved = carRepository.save(car);
+        List<Booking> allBookings = bookingRepository.findAll();
+        return toCarResponse(saved, allBookings);
+    }
+
+    /**
+     * 取得某台車的所有圖片列表
+     */
+    @Transactional(readOnly = true)
+    public List<AdminCarImageResponse> getCarImages(Integer carId) {
+        Car car = carRepository.findById(carId)
+                .orElseThrow(() -> new RuntimeException("找不到車輛 ID: " + carId));
+
+        return car.getImages() == null ? Collections.emptyList() :
+                car.getImages().stream()
+                        .sorted((a, b) -> {
+                            int sa = a.getSortOrder() == null ? 999 : a.getSortOrder();
+                            int sb = b.getSortOrder() == null ? 999 : b.getSortOrder();
+                            return Integer.compare(sa, sb);
+                        })
+                        .map(img -> {
+                            AdminCarImageResponse r = new AdminCarImageResponse();
+                            r.setId(img.getId());
+                            r.setImagePath(img.getImagePath());
+                            r.setSortOrder(img.getSortOrder());
+                            return r;
+                        })
+                        .collect(Collectors.toList());
+    }
+
+    /**
+     * 上傳車輛圖片
+     * - 儲存到 uploads/cars/ 資料夾
+     * - 在 car_images 表新增記錄，sortOrder = 當前最大值 + 1
+     */
+    public AdminCarImageResponse uploadCarImage(Integer carId, MultipartFile file) {
+        Car car = carRepository.findById(carId)
+                .orElseThrow(() -> new RuntimeException("找不到車輛 ID: " + carId));
+
+        if (file.isEmpty()) {
+            throw new RuntimeException("上傳的檔案不可為空");
+        }
+
+        // 驗證檔案類型
+        String originalFilename = file.getOriginalFilename();
+        if (originalFilename == null || !originalFilename.matches(".*\\.(jpg|jpeg|png|webp|gif)$")) {
+            throw new RuntimeException("僅支援 jpg、jpeg、png、webp、gif 格式");
+        }
+
+        // 產生唯一檔名：時間戳_UUID_原檔名
+        String ext = originalFilename.substring(originalFilename.lastIndexOf('.'));
+        String filename = System.currentTimeMillis() + "_" + UUID.randomUUID().toString().replace("-", "") + ext;
+
+        // 確保目錄存在
+        Path uploadPath = Paths.get(uploadDir, "cars");
+        try {
+            Files.createDirectories(uploadPath);
+            Path filePath = uploadPath.resolve(filename);
+            Files.copy(file.getInputStream(), filePath);
+        } catch (IOException e) {
+            throw new RuntimeException("圖片儲存失敗: " + e.getMessage());
+        }
+
+        // 計算 sortOrder（最大值 + 1）
+        int maxSort = 0;
+        if (car.getImages() != null) {
+            maxSort = car.getImages().stream()
+                    .mapToInt(img -> img.getSortOrder() == null ? 0 : img.getSortOrder())
+                    .max().orElse(-1) + 1;
+        }
+
+        // 儲存到資料庫
+        CarImage carImage = new CarImage();
+        carImage.setCar(car);
+        carImage.setImagePath("/uploads/cars/" + filename);
+        carImage.setSortOrder(maxSort);
+        CarImage saved = carImageRepository.save(carImage);
+
+        AdminCarImageResponse response = new AdminCarImageResponse();
+        response.setId(saved.getId());
+        response.setImagePath(saved.getImagePath());
+        response.setSortOrder(saved.getSortOrder());
+        return response;
+    }
+
+    /**
+     * 刪除車輛圖片
+     * - 從資料庫刪除記錄
+     * - 若圖片是上傳的（路徑以 /uploads/ 開頭），也從檔案系統刪除
+     */
+    public void deleteCarImage(Integer carId, Integer imageId) {
+        CarImage image = carImageRepository.findById(imageId)
+                .orElseThrow(() -> new RuntimeException("找不到圖片 ID: " + imageId));
+
+        // 確認圖片屬於該車輛
+        if (!image.getCar().getId().equals(carId)) {
+            throw new RuntimeException("此圖片不屬於車輛 ID: " + carId);
+        }
+
+        // 若是上傳的圖片，從磁碟刪除
+        String path = image.getImagePath();
+        if (path != null && path.startsWith("/uploads/")) {
+            try {
+                Path filePath = Paths.get(uploadDir, path.substring("/uploads/".length()));
+                Files.deleteIfExists(filePath);
+            } catch (IOException e) {
+                // 檔案刪除失敗不影響資料庫操作，只記錄
+                System.err.println("警告：無法刪除圖片檔案 " + path + ": " + e.getMessage());
+            }
+        }
+
+        carImageRepository.delete(image);
     }
 
     // ─────────────────────────────────────────────
@@ -362,6 +505,8 @@ public class AdminService {
         dto.setBrand(car.getBrand());
         dto.setPricePerDay(car.getPricePerDay());
         dto.setSeats(car.getSeats());
+        dto.setLuggageDesc(car.getLuggageDesc());
+        dto.setDescription(car.getDescription());
         dto.setIsAvailable(car.getIsAvailable());
 
         // 分類名稱（null 安全）

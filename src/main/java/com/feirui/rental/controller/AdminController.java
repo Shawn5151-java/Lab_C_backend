@@ -6,6 +6,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -107,6 +108,51 @@ public class AdminController {
     public ResponseEntity<AdminCarResponse> toggleCarAvailability(@PathVariable Integer id) {
         AdminCarResponse updated = adminService.toggleCarAvailability(id);
         return ResponseEntity.ok(updated);
+    }
+
+    /**
+     * PUT /api/admin/cars/{id}
+     * 更新車輛基本資料（名稱、品牌、日租金、座位數、行李描述、介紹）
+     */
+    @PutMapping("/cars/{id}")
+    public ResponseEntity<AdminCarResponse> updateCar(
+            @PathVariable Integer id,
+            @Valid @RequestBody AdminCarUpdateRequest request) {
+        AdminCarResponse updated = adminService.updateCar(id, request);
+        return ResponseEntity.ok(updated);
+    }
+
+    /**
+     * GET /api/admin/cars/{id}/images
+     * 取得某台車的所有圖片
+     */
+    @GetMapping("/cars/{id}/images")
+    public ResponseEntity<List<AdminCarImageResponse>> getCarImages(@PathVariable Integer id) {
+        return ResponseEntity.ok(adminService.getCarImages(id));
+    }
+
+    /**
+     * POST /api/admin/cars/{id}/images
+     * 上傳車輛圖片（multipart/form-data，欄位名稱為 file）
+     */
+    @PostMapping("/cars/{id}/images")
+    public ResponseEntity<AdminCarImageResponse> uploadCarImage(
+            @PathVariable Integer id,
+            @RequestParam("file") MultipartFile file) {
+        AdminCarImageResponse saved = adminService.uploadCarImage(id, file);
+        return ResponseEntity.ok(saved);
+    }
+
+    /**
+     * DELETE /api/admin/cars/{id}/images/{imageId}
+     * 刪除車輛圖片
+     */
+    @DeleteMapping("/cars/{id}/images/{imageId}")
+    public ResponseEntity<Void> deleteCarImage(
+            @PathVariable Integer id,
+            @PathVariable Integer imageId) {
+        adminService.deleteCarImage(id, imageId);
+        return ResponseEntity.noContent().build();
     }
 
     // ─────────────────────────────────────────────
