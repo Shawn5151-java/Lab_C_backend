@@ -389,6 +389,110 @@ public class AdminService {
         return toPromotionResponse(saved);
     }
 
+    /**
+     * 新增優惠活動
+     */
+    public AdminPromotionResponse createPromotion(AdminPromotionCreateRequest request) {
+        if (promotionRepository.findBySlug(request.getSlug()).isPresent()) {
+            throw new RuntimeException("Slug 已被使用：" + request.getSlug());
+        }
+        Promotion p = new Promotion();
+        p.setTitle(request.getTitle());
+        p.setSlug(request.getSlug());
+        p.setTag(request.getTag());
+        p.setIntro(request.getIntro());
+        p.setContent(request.getContent());
+        p.setPeriodStart(parseDate(request.getPeriodStart()));
+        p.setPeriodEnd(parseDate(request.getPeriodEnd()));
+        p.setIsActive(true);
+        return toPromotionResponse(promotionRepository.save(p));
+    }
+
+    /**
+     * 更新優惠活動基本資料
+     */
+    public AdminPromotionResponse updatePromotion(Integer id, AdminPromotionUpdateRequest request) {
+        Promotion p = promotionRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("找不到優惠活動 ID: " + id));
+
+        // 若 slug 有改，確認新 slug 不衝突
+        if (!p.getSlug().equals(request.getSlug()) &&
+                promotionRepository.findBySlug(request.getSlug()).isPresent()) {
+            throw new RuntimeException("Slug 已被使用：" + request.getSlug());
+        }
+
+        p.setTitle(request.getTitle());
+        p.setSlug(request.getSlug());
+        p.setTag(request.getTag());
+        p.setIntro(request.getIntro());
+        p.setContent(request.getContent());
+        p.setPeriodStart(parseDate(request.getPeriodStart()));
+        p.setPeriodEnd(parseDate(request.getPeriodEnd()));
+        return toPromotionResponse(promotionRepository.save(p));
+    }
+
+    /**
+     * 刪除優惠活動（連同磁碟上的圖片一起刪除）
+     */
+    public void deletePromotion(Integer id) {
+        Promotion p = promotionRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("找不到優惠活動 ID: " + id));
+
+        String path = p.getImagePath();
+        if (path != null && path.startsWith("/uploads/")) {
+            try {
+                Path filePath = Paths.get(uploadDir, path.substring("/uploads/".length()));
+                Files.deleteIfExists(filePath);
+            } catch (IOException e) {
+                System.err.println("警告：無法刪除活動圖片 " + path + ": " + e.getMessage());
+            }
+        }
+        promotionRepository.delete(p);
+    }
+
+    /**
+     * 上傳（或更換）優惠活動封面圖片
+     * 若原本已有圖片，先從磁碟刪除舊檔
+     */
+    public AdminPromotionResponse uploadPromotionImage(Integer id, MultipartFile file) {
+        Promotion p = promotionRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("找不到優惠活動 ID: " + id));
+
+        if (file.isEmpty()) {
+            throw new RuntimeException("上傳的檔案不可為空");
+        }
+
+        String originalFilename = file.getOriginalFilename();
+        if (originalFilename == null || !originalFilename.contains(".")) {
+            throw new RuntimeException("無效的檔案名稱");
+        }
+
+        // 刪除舊圖片
+        String oldPath = p.getImagePath();
+        if (oldPath != null && oldPath.startsWith("/uploads/")) {
+            try {
+                Path old = Paths.get(uploadDir, oldPath.substring("/uploads/".length()));
+                Files.deleteIfExists(old);
+            } catch (IOException e) {
+                System.err.println("警告：無法刪除舊活動圖片: " + e.getMessage());
+            }
+        }
+
+        // 儲存新圖片
+        String ext = originalFilename.substring(originalFilename.lastIndexOf('.'));
+        String filename = System.currentTimeMillis() + "_" + UUID.randomUUID().toString().replace("-", "") + ext;
+        Path uploadPath = Paths.get(uploadDir, "promotions");
+        try {
+            Files.createDirectories(uploadPath);
+            Files.copy(file.getInputStream(), uploadPath.resolve(filename));
+        } catch (IOException e) {
+            throw new RuntimeException("圖片儲存失敗: " + e.getMessage());
+        }
+
+        p.setImagePath("/uploads/promotions/" + filename);
+        return toPromotionResponse(promotionRepository.save(p));
+    }
+
     // ─────────────────────────────────────────────
     // 聯絡表單管理
     // ─────────────────────────────────────────────
@@ -583,6 +687,8 @@ public class AdminService {
         dto.setPeriodStart(formatDate(promotion.getPeriodStart()));
         dto.setPeriodEnd(formatDate(promotion.getPeriodEnd()));
         dto.setIsActive(promotion.getIsActive());
+        dto.setImagePath(promotion.getImagePath());
+        dto.setContent(promotion.getContent());
         dto.setCreatedAt(formatDateTime(promotion.getCreatedAt()));
         return dto;
     }
@@ -632,5 +738,14 @@ public class AdminService {
     private String formatDateTime(LocalDateTime dateTime) {
         if (dateTime == null) return null;
         return dateTime.format(DATETIME_FORMATTER);
+    }
+
+    private java.time.LocalDate parseDate(String dateStr) {
+        if (dateStr == null || dateStr.isBlank()) return null;
+        try {
+            return java.time.LocalDate.parse(dateStr, DATE_FORMATTER);
+        } catch (Exception e) {
+            return null;
+        }
     }
 }

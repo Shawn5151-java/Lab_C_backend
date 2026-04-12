@@ -212,6 +212,48 @@ public class AdminController {
     }
 
     /**
+     * POST /api/admin/promotions
+     * 新增優惠活動
+     */
+    @PostMapping("/promotions")
+    public ResponseEntity<AdminPromotionResponse> createPromotion(
+            @Valid @RequestBody AdminPromotionCreateRequest request) {
+        return ResponseEntity.status(201).body(adminService.createPromotion(request));
+    }
+
+    /**
+     * PUT /api/admin/promotions/{id}
+     * 更新優惠活動基本資料
+     */
+    @PutMapping("/promotions/{id}")
+    public ResponseEntity<AdminPromotionResponse> updatePromotion(
+            @PathVariable Integer id,
+            @Valid @RequestBody AdminPromotionUpdateRequest request) {
+        return ResponseEntity.ok(adminService.updatePromotion(id, request));
+    }
+
+    /**
+     * DELETE /api/admin/promotions/{id}
+     * 刪除優惠活動
+     */
+    @DeleteMapping("/promotions/{id}")
+    public ResponseEntity<Void> deletePromotion(@PathVariable Integer id) {
+        adminService.deletePromotion(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * POST /api/admin/promotions/{id}/image
+     * 上傳或更換優惠活動封面圖片
+     */
+    @PostMapping("/promotions/{id}/image")
+    public ResponseEntity<AdminPromotionResponse> uploadPromotionImage(
+            @PathVariable Integer id,
+            @RequestParam("file") MultipartFile file) {
+        return ResponseEntity.ok(adminService.uploadPromotionImage(id, file));
+    }
+
+    /**
      * PATCH /api/admin/promotions/{id}/active
      * 切換優惠活動上架/下架狀態
      */

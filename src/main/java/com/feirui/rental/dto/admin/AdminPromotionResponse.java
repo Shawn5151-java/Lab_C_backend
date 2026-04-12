@@ -18,5 +18,7 @@ public class AdminPromotionResponse {
     private String periodStart;  // LocalDate formatted as "yyyy-MM-dd"
     private String periodEnd;    // LocalDate formatted as "yyyy-MM-dd"
     private Boolean isActive;
+    private String imagePath;
+    private String content;
     private String createdAt;    // LocalDateTime formatted as "yyyy-MM-dd HH:mm"
 }
