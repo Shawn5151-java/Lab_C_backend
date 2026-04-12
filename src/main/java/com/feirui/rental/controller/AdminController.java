@@ -164,6 +164,17 @@ public class AdminController {
     }
 
     /**
+     * PATCH /api/admin/cars/{id}/images/{imageId}/set-main
+     * 將指定圖片設為封面（sort_order = 0），原封面與其對調
+     */
+    @PatchMapping("/cars/{id}/images/{imageId}/set-main")
+    public ResponseEntity<List<AdminCarImageResponse>> setMainImage(
+            @PathVariable Integer id,
+            @PathVariable Integer imageId) {
+        return ResponseEntity.ok(adminService.setMainImage(id, imageId));
+    }
+
+    /**
      * DELETE /api/admin/cars/{id}/images/{imageId}
      * 刪除車輛圖片
      */

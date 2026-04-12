@@ -305,6 +305,40 @@ public class AdminService {
      * - 從資料庫刪除記錄
      * - 若圖片是上傳的（路徑以 /uploads/ 開頭），也從檔案系統刪除
      */
+    /**
+     * 將指定圖片設為封面（sort_order = 0）
+     * 原封面圖片的 sort_order 與目標圖片對調
+     */
+    public List<AdminCarImageResponse> setMainImage(Integer carId, Integer imageId) {
+        CarImage target = carImageRepository.findById(imageId)
+                .orElseThrow(() -> new RuntimeException("找不到圖片 ID: " + imageId));
+        if (!target.getCar().getId().equals(carId)) {
+            throw new RuntimeException("此圖片不屬於車輛 ID: " + carId);
+        }
+        if (Integer.valueOf(0).equals(target.getSortOrder())) {
+            // 已經是封面，直接回傳現有列表
+            return getCarImages(carId);
+        }
+
+        // 找到目前 sort_order=0 的封面圖片，與 target 對調
+        int oldSort = target.getSortOrder() == null ? 1 : target.getSortOrder();
+        carImageRepository.findById(imageId); // already fetched
+        Car car = target.getCar();
+        if (car.getImages() != null) {
+            car.getImages().stream()
+                    .filter(img -> Integer.valueOf(0).equals(img.getSortOrder()))
+                    .findFirst()
+                    .ifPresent(currentMain -> {
+                        currentMain.setSortOrder(oldSort);
+                        carImageRepository.save(currentMain);
+                    });
+        }
+        target.setSortOrder(0);
+        carImageRepository.save(target);
+
+        return getCarImages(carId);
+    }
+
     public void deleteCarImage(Integer carId, Integer imageId) {
         CarImage image = carImageRepository.findById(imageId)
                 .orElseThrow(() -> new RuntimeException("找不到圖片 ID: " + imageId));
