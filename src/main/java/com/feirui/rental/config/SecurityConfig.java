@@ -35,7 +35,6 @@ import java.util.List;
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-    // 注入 JWT 過濾器，讓 Security 在驗證前先跑 JWT 檢查
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
     /**
@@ -95,6 +94,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/auth/**").permitAll()          // 登入、註冊
                 .requestMatchers(HttpMethod.GET, "/api/cars/**").permitAll()       // 瀏覽車輛
                 .requestMatchers(HttpMethod.GET, "/api/promotions/**").permitAll() // 瀏覽優惠
+                .requestMatchers(HttpMethod.GET, "/api/addons").permitAll()        // 前台加購項目列表
                 .requestMatchers(HttpMethod.POST, "/api/contacts").permitAll()     // 送出聯絡表單
                 .requestMatchers(HttpMethod.POST, "/api/bookings").permitAll()     // 訪客也可以建立訂單
 
@@ -106,8 +106,6 @@ public class SecurityConfig {
             )
 
             // ── JWT 過濾器 ─────────────────────────────────────────────
-            // 在 Spring Security 的帳密驗證過濾器「之前」插入 JWT 過濾器
-            // 讓 JWT Token 驗證優先執行
             .addFilterBefore(jwtAuthenticationFilter,
                     UsernamePasswordAuthenticationFilter.class);
 

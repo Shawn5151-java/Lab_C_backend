@@ -45,6 +45,7 @@ public class AdminService {
     private final UserRepository userRepository;
     private final BookingRepository bookingRepository;
     private final CarRepository carRepository;
+    private final CarCategoryRepository carCategoryRepository;
     private final AddonRepository addonRepository;
     private final PromotionRepository promotionRepository;
     private final ContactRepository contactRepository;
@@ -147,6 +148,35 @@ public class AdminService {
         return carRepository.findAll().stream()
                 .map(car -> toCarResponse(car, allBookings))
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * 取得所有車款分類
+     */
+    @Transactional(readOnly = true)
+    public List<CarCategory> getCarCategories() {
+        return carCategoryRepository.findAll();
+    }
+
+    /**
+     * 新增車輛
+     */
+    public AdminCarResponse createCar(AdminCarCreateRequest request) {
+        CarCategory category = carCategoryRepository.findById(request.getCategoryId())
+                .orElseThrow(() -> new RuntimeException("找不到分類 ID: " + request.getCategoryId()));
+
+        Car car = new Car();
+        car.setCategory(category);
+        car.setName(request.getName());
+        car.setBrand(request.getBrand());
+        car.setPricePerDay(request.getPricePerDay());
+        car.setSeats(request.getSeats());
+        car.setLuggageDesc(request.getLuggageDesc());
+        car.setDescription(request.getDescription());
+        car.setIsAvailable(true);
+
+        Car saved = carRepository.save(car);
+        return toCarResponse(saved, bookingRepository.findAll());
     }
 
     /**

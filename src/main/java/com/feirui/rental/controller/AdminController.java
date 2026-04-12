@@ -101,6 +101,26 @@ public class AdminController {
     }
 
     /**
+     * GET /api/admin/car-categories
+     * 取得所有車款分類（供新增車輛表單使用）
+     */
+    @GetMapping("/car-categories")
+    public ResponseEntity<List<com.feirui.rental.entity.CarCategory>> getCarCategories() {
+        return ResponseEntity.ok(adminService.getCarCategories());
+    }
+
+    /**
+     * POST /api/admin/cars
+     * 新增車輛
+     */
+    @PostMapping("/cars")
+    public ResponseEntity<AdminCarResponse> createCar(
+            @Valid @RequestBody AdminCarCreateRequest request) {
+        AdminCarResponse created = adminService.createCar(request);
+        return ResponseEntity.status(201).body(created);
+    }
+
+    /**
      * PATCH /api/admin/cars/{id}/availability
      * 切換車輛上架/下架狀態
      */

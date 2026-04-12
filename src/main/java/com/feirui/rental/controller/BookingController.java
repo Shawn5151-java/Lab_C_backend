@@ -92,8 +92,15 @@ public class BookingController {
      *   Header: Authorization: Bearer eyJhbGci...
      */
     @GetMapping("/{id}")
-    public ResponseEntity<BookingResponse> getBookingById(@PathVariable Integer id) {
-        return ResponseEntity.ok(bookingService.getBookingById(id));
+    public ResponseEntity<BookingResponse> getBookingById(
+            @PathVariable Integer id,
+            @AuthenticationPrincipal String email) {
+        BookingResponse booking = bookingService.getBookingById(id);
+        // 驗證訂單屬於當前登入用戶（防止 IDOR）
+        if (email != null && !bookingService.isOwner(id, email)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        return ResponseEntity.ok(booking);
     }
 }
 

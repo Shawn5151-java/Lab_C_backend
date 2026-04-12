@@ -141,6 +141,16 @@ public class BookingService {
     }
 
     /**
+     * 確認訂單是否屬於指定 email 的會員（防 IDOR）
+     */
+    @Transactional(readOnly = true)
+    public boolean isOwner(Integer bookingId, String email) {
+        return bookingRepository.findById(bookingId)
+                .map(b -> b.getUser() != null && email.equals(b.getUser().getEmail()))
+                .orElse(false);
+    }
+
+    /**
      * 查詢單筆訂單詳情
      *
      * @param bookingId 訂單 ID
