@@ -258,9 +258,9 @@ public class AdminService {
             throw new RuntimeException("上傳的檔案不可為空");
         }
 
-        // 驗證檔案類型
+        // 驗證檔案類型（不區分大小寫）
         String originalFilename = file.getOriginalFilename();
-        if (originalFilename == null || !originalFilename.matches(".*\\.(jpg|jpeg|png|webp|gif)$")) {
+        if (originalFilename == null || !originalFilename.toLowerCase().matches(".*\\.(jpg|jpeg|png|webp|gif)$")) {
             throw new RuntimeException("僅支援 jpg、jpeg、png、webp、gif 格式");
         }
 
@@ -273,7 +273,7 @@ public class AdminService {
         try {
             Files.createDirectories(uploadPath);
             Path filePath = uploadPath.resolve(filename);
-            Files.copy(file.getInputStream(), filePath);
+            Files.copy(file.getInputStream(), filePath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
         } catch (IOException e) {
             throw new RuntimeException("圖片儲存失敗: " + e.getMessage());
         }
@@ -300,11 +300,6 @@ public class AdminService {
         return response;
     }
 
-    /**
-     * 刪除車輛圖片
-     * - 從資料庫刪除記錄
-     * - 若圖片是上傳的（路徑以 /uploads/ 開頭），也從檔案系統刪除
-     */
     /**
      * 將指定圖片設為封面（sort_order = 0）
      * 原封面圖片的 sort_order 與目標圖片對調
